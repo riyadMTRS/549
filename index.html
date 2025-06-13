@@ -578,22 +578,54 @@
         setMessages((prev) => [...prev, userMessage]);
         setInput(''); // Clear input immediately
 
-        setIsLoading(true); // Show loading indicator
-        setIsTyping(false); // Stop any ongoing typing animation if any
+        setIsLoading(true);
+        setIsTyping(false);
 
         try {
-          const botResponseText = getManualResponse(sanitizedInput);
+          // 4. Implement Fallback Strategy
+          const manualResponseText = getManualResponse(sanitizedInput);
+          const isDefaultManualResponse = knowledgeBase.default_response.includes(manualResponseText);
 
-          // Add a temporary message for typing animation
-          setMessages((prev) => [...prev, { sender: 'bot', text: '', fullText: botResponseText }]);
-          setIsLoading(false); // Hide loading indicator as typing starts
-          setTypingText('');
-          currentTypingIndex.current = 0;
-          setIsTyping(true); // Start typing animation
+          if (!isDefaultManualResponse) {
+            // 4.a. Display manual response if it's specific
+            setMessages((prev) => [...prev, { sender: 'bot', text: '', fullText: manualResponseText }]);
+            setIsLoading(false);
+            setTypingText('');
+            currentTypingIndex.current = 0;
+            setIsTyping(true);
+          } else {
+            // 4.b. / 5. Call Backend API if manual response is default
+            try {
+              const response = await fetch('/api/chat', { // Using relative path
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: sanitizedInput }),
+              });
 
+              const data = await response.json();
+              let botResponseText;
+
+              if (response.ok) {
+                botResponseText = data.response || "Riyad's VibeBot received an empty response.";
+              } else {
+                botResponseText = data.error || "Riyad's VibeBot had trouble understanding the response from the server.";
+              }
+              setMessages((prev) => [...prev, { sender: 'bot', text: '', fullText: botResponseText }]);
+            } catch (apiError) {
+              console.error("API call failed:", apiError);
+              setMessages((prev) => [...prev, { sender: 'bot', text: "Riyad's VibeBot is having trouble connecting. Please try again later.", fullText: "Riyad's VibeBot is having trouble connecting. Please try again later." }]);
+            } finally {
+              setIsLoading(false);
+              setTypingText('');
+              currentTypingIndex.current = 0;
+              setIsTyping(true);
+            }
+          }
         } catch (error) {
-          console.error("Error generating manual response:", error);
-          setMessages((prev) => [...prev, { sender: 'bot', text: "Riyad's VibeBot encountered an internal error. Please try again!", fullText: "Riyad's VibeBot encountered an internal error. Please try again!" }]);
+          console.error("Error in handleSend:", error);
+          setMessages((prev) => [...prev, { sender: 'bot', text: "Riyad's VibeBot encountered an unexpected issue. Please try again!", fullText: "Riyad's VibeBot encountered an unexpected issue. Please try again!" }]);
           setIsLoading(false);
         }
       };
