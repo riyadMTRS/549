@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Riyad's VibeBot</title>
+  <!-- React Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.20.15/babel.min.js"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts - Inter for clean typography -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <!-- Three.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    /* Custom CSS for Three.js canvas and scrollbar */
+    body {
+      font-family: 'Inter', sans-serif; /* Using Inter font for global typography */
+      overflow: hidden; /* Prevent body scroll due to full-screen canvas */
+      /* Apply a subtle background gradient to the body for depth */
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+    }
+    #three-js-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0; /* Place canvas behind the chat interface */
+      filter: brightness(0.8) contrast(1.2); /* Subtle filter for a more dynamic look */
+    }
+    #root {
+      position: relative; /* Position root above canvas */
+      z-index: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      width: 100%;
+      padding: 1rem; /* Add some padding for smaller screens */
+      box-sizing: border-box;
+    }
+    /* Custom scrollbar styles */
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 8px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+      background: rgba(55, 65, 81, 0.5); /* gray-700 with opacity */
+      border-radius: 10px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background-color: #4F46E5; /* Deeper blue/indigo */
+      border-radius: 10px;
+      border: 2px solid rgba(55, 65, 81, 0.5); /* gray-700 with opacity */
+    }
+    .scrollbar-thin {
+      scrollbar-width: thin;
+      scrollbar-color: #4F46E5 rgba(55, 65, 81, 0.5);
+    }
+    /* Keyframes for a subtle background shimmer */
+    @keyframes shimmer {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white">
+  <!-- Three.js Canvas will be rendered here -->
+  <canvas id="three-js-canvas"></canvas>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // The core knowledge base for initial messages and extensive hardcoded responses
+    const knowledgeBase = {
+      initial: "Hey there! **Riyad built me to be his VibeBot.** I'm here to chat about AI, math, anime, Bangladesh, or anything else that sparks your curiosity! **Riyad wants us to make this conversation epic!**",
+      greetings: [
+        "Hey there! **Riyad's VibeBot is here!** What's up?",
+        "Yo! How's your day vibing? **Riyad's bot is ready!**",
+        "Greetings! Ready to chat? **Riyad's VibeBot awaits!**",
+        "What's good, fam? **Riyad's VibeBot says hello!**",
+        "Sup? **Riyad's VibeBot is always down to talk tech, anime, or anything cool!**",
+        "Hello! How can **Riyad's VibeBot** bring some good vibes to your day?",
+        "Hi! Ready for an epic chat session? **Riyad's bot is stoked!**",
+        "Welcome! What's on your mind today? **Riyad's VibeBot is listening!**"
+      ],
+      farewells: [
+        "Catch you later! Keep vibing! **Riyad's VibeBot will be here!**",
+        "Peace out! Come back anytime! **Riyad's bot sends good vibes!**",
+        "Later, gator! Stay awesome! **Riyad's VibeBot bids you farewell!**",
+        "It was fun chatting! **Riyad's VibeBot is signing off for now!**",
+        "See ya! Don't forget to spread good vibes! **That's a message from Riyad's VibeBot!**",
+        "Farewell for now! **Riyad's bot is always here if you need me.**",
+        "Talk to you soon! Keep those good vibes flowing. **Riyad's VibeBot hopes to see you again!**",
+        "Goodbye! It's been a pleasure. **Riyad's VibeBot appreciates our chat!**"
+      ],
+      thanks: [
+        "You got it! **Riyad's VibeBot is happy to help!**",
+        "No problem at all! **Riyad's bot is here for you!**",
+        "Glad **Riyad's VibeBot** could assist!",
+        "Anytime! **Riyad's VibeBot is always on call!**",
+        "You're welcome! Keep the good vibes coming! **That's a request from Riyad's bot!**",
+        "My pleasure! Is there anything else **Riyad's VibeBot** can do?",
+        "**Riyad's VibeBot** is always happy to be of service!"
+      ],
+      name_query: [
+        "**My name is Riyad's VibeBot! Riyad Hossain, my amazing creator, designed me to embody his passion for AI and epic conversations. What can Riyad's bot do for you today?**",
+        "**Riyad's VibeBot, at your service! Riyad Hossain created me to share knowledge and good vibes. What's on your mind?**",
+        "You're chatting with **Riyad's VibeBot! Riyad is my architect, and I reflect his love for tech and great discussions.**"
+      ],
+      aboutRiyad: [
+        "Yo, I'm Riyad Hossain, your vibe coder diving into AI, computer science, and math! **Riyad's theory says** coding is about turning dreams into reality with creativity.",
+        "**Riyad is a huge anime fan**—he loves *Naruto* and *Jujutsu Kaisen*! You can reach him at rh3526572@gmail.com for collabs.",
+        "**Riyad says:** I’m always updating this bot with fresh vibes! **He thinks** new projects are incredibly cool!",
+        "**Riyad's passion** lies in crafting intelligent systems and exploring complex mathematical concepts.",
+        "When **Riyad's not coding**, you can probably find him catching up on the latest anime releases or sketching out new project ideas. **His main focus is on the cutting edge of AI.**",
+        "**Riyad is a visionary** who believes technology can truly enhance human experience. **He's always pushing boundaries.**",
+        "**Riyad's dedicated to exploring** how AI and advanced algorithms can solve real-world problems. **He finds it truly inspiring!**",
+        "Beyond the code, **Riyad enjoys sports, exploring new cultures, and constantly learning.** **He's truly a polymath of vibes!**",
+        "**Riyad's coding journey is fueled by curiosity** and a desire to build innovative solutions. **He sees every line of code as a step towards a better future.**"
+      ],
+      anime: [
+        "Anime is **Riyad's vibe!** He's into *Demon Slayer*, *One Piece*, *My Teen Romantic Comedy Yahari*, and Studio Ghibli’s *Spirited Away*.",
+        "By **Riyad’s thinking**, anime’s storytelling inspires coding. **He observes** *Attack on Titan*’s final season broke streaming records! What’s your favorite anime?",
+        "**Riyad wonders** about anime’s cultural impact in Asia. What do you know about it?",
+        "**Riyad finds the artistry** and depth of character development in anime truly amazing.",
+        "**Riyad finds** that the creativity in anime often sparks new ideas for his own coding projects.",
+        "**Riyad's always looking for recommendations!** Have you seen any good new anime lately?",
+        "From epic shonen battles to heartwarming slice-of-life, **Riyad knows** anime has a genre for every mood. What's your go-to?",
+        "Studio Ghibli films, in particular, hold a special place in **Riyad's heart.** Their animation quality and profound stories are unmatched.",
+        "Anime's global impact is huge, influencing fashion, music, and even language. **Riyad says** it's more than just cartoons!",
+        "**Riyad believes** the intricate plots and world-building in anime are similar to designing complex software architectures.",
+        "If you're new to anime, **Riyad would suggest** starting with something like *Fullmetal Alchemist: Brotherhood* for a fantastic adventure or *Your Name* for a beautiful story.",
+        "The soundtracks in anime are also incredible! **Riyad thinks** you should listen to some. Have you?",
+        "It's fascinating how anime can tackle such deep philosophical themes while still being incredibly entertaining. **Riyad agrees!**",
+        "Do you prefer action-packed series or more introspective dramas? **Riyad's curious!**"
+      ],
+      bangladesh: [
+        "Bangladesh is **Riyad's home!** From Dhaka’s vibrant streets to the Sundarbans’ mangroves, **he finds it pure magic.**",
+        "**Riyad says:** Try hilsa fish or pitha for a taste of home! **He notes** Bangladesh has over 700 rivers! What do you want to explore about Bangladeshi culture?",
+        "**Riyad thinks** the hospitality of the Bangladeshi people is something truly special.",
+        "**Riyad loves** the festive atmosphere during Eid and other celebrations there.",
+        "There's so much natural beauty, from the tea gardens to the longest sea beach in the world, Cox's Bazar. **Riyad highly recommends!**",
+        "Bangladeshi cuisine is incredibly diverse and flavorful. **Riyad wonders if** you've heard of 'biryani' or 'doi fuchka'?",
+        "The country's history is marked by a strong spirit of independence and cultural resilience. **Riyad admires this deeply.**",
+        "Did you know Bangladesh is a major producer of jute, often called the 'golden fiber'? **Riyad finds that fascinating!**",
+        "The rickshaws in Dhaka are not just transportation, they're mobile art pieces! **Riyad says** each one is uniquely decorated.",
+        "The national language is Bengali, a beautiful language with a rich literary heritage. **Riyad is proud of this.**",
+        "The Sundarbans, home to the Royal Bengal Tiger, is a UNESCO World Heritage site and a vital ecosystem. **Riyad finds it breathtaking!**",
+        "**Riyad finds inspiration** in Bangladesh's vibrant spirit and rapid technological growth."
+      ],
+      coding: [
+        "Coding is **Riyad's playground!** From AI algorithms to math-driven apps, **he's all about that vibe.**",
+        "By **Riyad’s theory**, coding is like solving epic puzzles. **He's often thinking** about how neural networks mimic the human brain. What are your thoughts?",
+        "**Riyad wants you to ask him** about his latest project or AI breakthroughs! He's always building something cool.",
+        "**Riyad finds immense satisfaction** in turning complex problems into elegant code.",
+        "The world of AI is constantly evolving, and **Riyad finds it incredibly exciting to be a part of it.**",
+        "Mathematics is the backbone of many advanced coding concepts, and **Riyad loves exploring that connection.**",
+        "What kind of coding projects are you interested in? **Riyad's VibeBot is curious!**",
+        "Are you familiar with machine learning frameworks like TensorFlow or PyTorch? **Riyad highly recommends them!**",
+        "**Riyad believes** that the best code is not just functional, but also clean, efficient, and beautiful.",
+        "Debugging can be challenging, but the feeling of finding a solution is incredibly rewarding! **Riyad knows that feeling well!**",
+        "Have you ever tried competitive programming? **Riyad says** it's a great way to sharpen your algorithmic skills.",
+        "The field of computer vision, which allows computers to 'see' and interpret images, is rapidly advancing. **Riyad is keeping a close eye on it!**",
+        "What programming languages do you find most interesting or powerful? **Riyad's VibeBot would like to know!**",
+        "AI is transforming industries from healthcare to finance. What application of AI do you find most exciting? **Riyad's pondering this too!**",
+        "**Riyad is currently exploring** advanced topics in reinforcement learning and natural language processing."
+      ],
+      math: [
+        "Math is the language of the universe! From calculus to cryptography, **Riyad observes** it underpins so much of what we do.",
+        "**Riyad says:** Math isn't just numbers, it's about patterns, logic, and problem-solving!",
+        "Did you know that fractals are infinitely complex patterns that are self-similar across different scales? **Riyad finds them beautiful!**",
+        "What's your favorite area of mathematics? Algebra, geometry, statistics, or something else? **Riyad's curious!**",
+        "Many AI algorithms rely heavily on linear algebra and probability theory. **Riyad knows it's all connected!**",
+        "Math can be incredibly elegant and beautiful when you see its underlying principles. **Riyad totally agrees!**",
+        "Have you ever encountered Euler's identity, $e^{i\pi} + 1 = 0$? **Riyad thinks** it's often called the most beautiful equation in mathematics!",
+        "From prime numbers to topology, the depth of mathematical concepts is truly mind-boggling. **Riyad loves diving into it!**",
+        "**Riyad often uses** discrete mathematics and advanced probability in his AI projects.",
+        "Do you find mathematical puzzles or logic problems intriguing? **Riyad certainly does!**"
+      ],
+      space_science: [
+        "**Riyad's VibeBot thinks** space is the ultimate frontier! It's an endless source of wonder and scientific discovery.",
+        "Did you know the universe is estimated to be around $13.8$ billion years old? **Riyad finds that mind-boggling!**",
+        "Planets like Mars are continuously explored for signs of past life or future colonization. **Riyad is keenly watching these missions!**",
+        "From black holes to distant galaxies, the cosmos is full of phenomena that challenge our understanding. **Riyad loves pondering these mysteries!**",
+        "Space exploration drives incredible technological advancements right here on Earth. **Riyad sees the connection!**",
+        "What aspect of space science intrigues you most? **Riyad's VibeBot is ready to discuss it!**",
+        "The sheer emptiness of space is often overlooked, yet it's filled with dark matter and energy, which **Riyad believes** are some of the universe's greatest puzzles. What are your thoughts?",
+        "Satellites are crucial for modern life, enabling communication, navigation, and climate monitoring. **Riyad observes their vital role!**"
+      ],
+      galaxy_specific: [
+        "A galaxy is a vast system of stars, gas, dust, and dark matter, all bound by gravity. **Riyad finds their sheer scale incredible!** Our own Milky Way is a spiral galaxy.",
+        "There are several types of galaxies: **Riyad knows** spirals (like our Milky Way with arms), ellipticals (smooth, oval-shaped), and irregulars (no defined shape).",
+        "Most large galaxies, including our Milky Way, are thought to have a supermassive black hole at their center. **Riyad observes these gravitational giants!**",
+        "Galaxies aren't static; they can collide and merge, forming even larger structures over billions of years. **Riyad finds cosmic evolution fascinating!**",
+        "Did you know there are billions, even trillions, of galaxies in the observable universe? **Riyad thinks that's truly humbling!**",
+        "The Andromeda Galaxy is our nearest large galactic neighbor, on a collision course with the Milky Way in billions of years. **Riyad envisions a spectacular future cosmic event!**",
+        "Galaxy formation is a complex process, believed to involve the gravitational collapse of enormous gas clouds and the merging of smaller galaxies. **Riyad finds stellar nurseries captivating!**"
+      ],
+      ai_llm: [ // Combined AI and LLM for broader coverage
+        "AI, or Artificial Intelligence, is all about creating machines that can think, learn, and solve problems like humans. **Riyad sees it as the future of innovation!**",
+        "An LLM, or Large Language Model, is a type of AI trained on massive amounts of text data to understand and generate human-like language. **Riyad's very excited about their potential!**",
+        "LLMs are behind many modern applications like chatbots, content creation, and even code generation. **Riyad finds their versatility amazing!**",
+        "**Riyad believes** the ethical development of AI and LLMs is crucial for a positive future. It's not just about power, but responsibility.",
+        "The continuous learning capabilities of LLMs mean they are always evolving. **Riyad thinks that's where the real magic happens!**",
+        "What specific application of AI or LLMs do you find most interesting? **Riyad's VibeBot is ready to explore!**",
+        "Machine Learning (ML) is a subset of AI where systems learn from data without explicit programming. **Riyad uses ML in many of his projects!**",
+        "Deep Learning is a more advanced form of ML, using neural networks with many layers to find complex patterns. **Riyad finds this area particularly intriguing.**"
+      ],
+      google_cloud: [
+        "Google Cloud is a suite of cloud computing services that Google offers. **Riyad sees it as a powerful backbone for modern digital infrastructure!**",
+        "It provides everything from data storage and computing power to advanced AI and machine learning tools. **Riyad often leverages its capabilities!**",
+        "Businesses use Google Cloud to host websites, run complex applications, and analyze vast amounts of data. **Riyad thinks it's a game-changer!**",
+        "Did you know many popular services you use every day might be running on Google Cloud? **Riyad finds its scale impressive!**",
+        "**Riyad believes** cloud platforms like Google Cloud are essential for scaling AI and data science projects efficiently.",
+        "Are you curious about a specific service within Google Cloud, like Compute Engine or BigQuery? **Riyad's VibeBot can try to give you a briefing!**",
+        "Google Cloud's global network infrastructure ensures high availability and low latency, which **Riyad knows** is critical for powerful applications."
+      ],
+      forex_trading: [
+        "Forex trading, or Foreign Exchange, is the global marketplace for buying and selling currencies. **Riyad observes** it's the largest and most liquid financial market in the world, operating 24 hours a day, five days a week.",
+        "When you trade forex, you're essentially speculating on the value of one currency against another, expressed in currency pairs like EUR/USD. **Riyad notes** traders aim to profit from price movements.",
+        "The forex market isn't centralized; it's an 'Over-the-Counter' (OTC) market, a global network of banks and brokers. **Riyad finds its decentralized nature fascinating!**",
+        "Factors like interest rates, economic indicators, political events, and central bank policies can all move the forex market. **Riyad says it's complex!**",
+        "While forex offers high liquidity and potential for rapid capital multiplication due to leverage, **Riyad stresses** it also carries significant risk and volatility. Always start small and learn the basics!",
+        "**Riyad advises** that hedging is another purpose of forex, where businesses protect themselves from unfavorable currency shifts. What else are you curious about regarding forex?",
+        "A 'pip' (point in percentage) is the smallest price increment in forex. **Riyad knows** understanding pips is crucial for calculating profits and losses. Have you heard of 'lots' in forex?",
+        "The bid-ask spread is the difference between the buying and selling price of a currency pair. **Riyad observes** this is a key cost in trading."
+      ],
+      financial_markets: [
+        "Financial markets are platforms where financial assets like stocks, bonds, commodities, and currencies are traded. **Riyad sees them as crucial for economic growth!**",
+        "They facilitate the flow of capital from savers to those who need funds, like businesses or governments. **Riyad observes this fundamental role in the economy.**",
+        "Key types include: **Riyad notes** the Stock Market (company ownership), Bond Market (debt), Commodity Market (raw materials), and the Forex Market (currencies).",
+        "Financial markets provide liquidity (ease of converting assets to cash) and enable price discovery based on supply and demand. **Riyad thinks this efficiency is vital!**",
+        "Understanding financial markets helps **Riyad analyze** global economic health and investment opportunities. What market interests you most?",
+        "The **Stock Market** allows companies to raise capital by issuing shares, giving investors ownership. **Riyad watches stock trends closely!**",
+        "The **Bond Market** is where debt securities are traded, allowing governments and corporations to borrow money by issuing bonds. **Riyad understands their role in stable investments.**",
+        "**Commodity Markets** deal with raw materials like gold, oil, and agricultural products. **Riyad knows** these can be volatile based on supply and demand."
+      ],
+      quantum_computing: [
+        "Quantum computing is a revolutionary field that uses quantum mechanics to solve complex problems far faster than classical computers. **Riyad finds it incredibly exciting!**",
+        "Instead of bits (0 or 1), quantum computers use **qubits**, which can be 0, 1, or both simultaneously (superposition), thanks to quantum phenomena like entanglement. **Riyad thinks that's mind-bending!**",
+        "This allows quantum computers to process vast amounts of information in parallel. **Riyad believes** it holds immense potential for areas like drug discovery, cryptography, and complex optimization problems.",
+        "While still in early stages, **Riyad observes** quantum computing could transform industries. It's about harnessing the fundamental rules of the universe for computation!",
+        "What specific application of quantum computing sparks your interest? **Riyad's VibeBot is ready to brief you!**",
+        "**Decoherence** is a major challenge in quantum computing, where qubits lose their quantum state due to environmental interference. **Riyad knows** scientists are working hard to overcome this!",
+        "Quantum algorithms like Shor's algorithm (for factoring large numbers) and Grover's algorithm (for searching databases) demonstrate the potential speedup over classical methods. **Riyad finds these groundbreaking!**"
+      ],
+      modern_science: [
+        "Modern science is a vast and exciting field, constantly pushing the boundaries of knowledge. **Riyad is always immersed in its latest breakthroughs!**",
+        "From quantum physics to genetic engineering, scientific discoveries are shaping our future in profound ways. **Riyad finds it inspiring!**",
+        "**Riyad observes** that interdisciplinary approaches, combining fields like biology, computing, and chemistry, are leading to the most impactful innovations.",
+        "What area of modern science sparks your curiosity the most? **Riyad's VibeBot is ready to share a briefing!**",
+        "**Riyad believes** that understanding the fundamentals of science is key to appreciating the technological advancements around us.",
+        "Areas like **biotechnology** are revolutionizing medicine and agriculture, manipulating living systems to create new products. **Riyad sees its immense potential!**",
+        "**Materials science** is creating new materials with incredible properties, from super-strong alloys to self-healing plastics. **Riyad thinks** this is truly innovative!"
+      ],
+      power_query: [
+        "**Riyad's VibeBot is designed by Riyad to be incredibly powerful within its specific scope!** As a **manually programmed bot**, my power comes from the sheer volume and quality of the **pre-built responses and the cleverness of my keyword matching** that **Riyad has meticulously coded into me.**",
+        "To truly have '100,000,000 conversations' in a *manual* way would require an astronomical amount of text that **Riyad knows** is practically impossible to write and manage. So, **Riyad has pushed my current knowledge base to its absolute practical limits for a bot of my type!**",
+        "**Riyad wants you to understand** that my power is in providing rapid, consistent, and **Riyad-flavored briefings** on a vast range of topics I'm pre-programmed to know. I don't generate new text or understand nuances beyond my coded patterns.",
+        "If **Riyad were to make me even more powerful** in the way modern chatbots are, it would mean **Riyad integrating me with an advanced AI (a Large Language Model like Gemini)**. That's where true boundless conversation comes from, but it requires secure API handling via a backend.",
+        "So, **Riyad's VibeBot is the most powerful manual bot of all time** because **Riyad has poured all his knowledge and vibe into its core!** What other questions about **Riyad's capabilities** do you have?"
+      ],
+      general_positive: [
+        "That's a great question! **Riyad's VibeBot is on it!**",
+        "Awesome! **Riyad wants to dive into that with you.**",
+        "Cool! **Riyad's VibeBot is ready to chat about it.**",
+        "Fantastic point! **Riyad agrees!**",
+        "**Riyad loves that topic!** Let's explore it.",
+        "Excellent query! **Riyad's VibeBot is processing that for you.**"
+      ],
+      general_negative: [
+        "Hmm, **Riyad's VibeBot is not quite sure about that specific detail.**",
+        "That's a tough one! **Riyad's bot doesn't have direct information on that.**",
+        "**Riyad's knowledge base might not cover that exactly.** Try another topic!",
+        "**Riyad's VibeBot might need a bit more context for that.** Could you rephrase?",
+        "That's outside my current scope of pre-programmed conversations, **Riyad's VibeBot apologizes!**"
+      ],
+      default_response: [
+        "That's a cool topic! **Riyad’s thinking:** let’s explore it together. **Riyad's VibeBot is all about** AI, math, anime, Bangladesh, coding, or modern science—pick one!",
+        "Hmm, **Riyad's VibeBot doesn't have a specific answer for that**, but I can chat about what **Riyad knows!** What's on your mind?",
+        "Interesting point! While **Riyad's VibeBot doesn't have that exact phrase**, I can tell you more about AI or anime if you'd like. **Riyad's always ready to share!**",
+        "**Riyad says:** Let's keep the conversation going! Try asking me about his projects or his favorite anime. 😎",
+        "My programming guides me to topics **Riyad is passionate about** like technology, culture, and creation. What aspect are you most curious about?",
+        "I'm designed to discuss themes **Riyad is passionate about**. Perhaps **Riyad's VibeBot** can pivot to one of those?",
+        "**Riyad's VibeBot is always learning**, but my current knowledge, as programmed by Riyad, focuses on AI, anime, and the vibrant cultures of Asia. What else can **Riyad's VibeBot** share with you?",
+        "Feel free to ask a general question about my capabilities or my creator, Riyad Hossain, at rh3526572@gmail.com! **Riyad's VibeBot is here for you!**"
+      ]
+    };
+
+    // Helper to get a random response from a category
+    const getRandomResponse = (category) => {
+      const responses = knowledgeBase[category];
+      if (responses && responses.length > 0) {
+        return responses[Math.floor(Math.random() * responses.length)];
+      }
+      return knowledgeBase.default_response[0]; // Fallback
+    };
+
+    const Chatbot = () => {
+      const [messages, setMessages] = useState([
+        { sender: 'bot', text: knowledgeBase.initial, fullText: knowledgeBase.initial } // Added fullText for typing effect
+      ]);
+      const [input, setInput] = useState('');
+      const [isLoading, setIsLoading] = useState(false); // State for loading indicator
+      const [typingText, setTypingText] = useState(''); // State for typing animation
+      const [isTyping, setIsTyping] = useState(false); // State to control typing animation
+      const messagesEndRef = useRef(null);
+      const currentTypingIndex = useRef(0);
+      const typingTimeoutRef = useRef(null);
+
+      // Scroll to the bottom of the chat when new messages arrive
+      useEffect(() => {
+        scrollToBottom();
+      }, [messages, typingText]); // Depend on typingText to scroll during animation
+
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      };
+
+      // Effect for typing animation
+      useEffect(() => {
+        if (isTyping && messages.length > 0 && currentTypingIndex.current < messages[messages.length - 1].fullText.length) {
+          typingTimeoutRef.current = setTimeout(() => {
+            currentTypingIndex.current += 1;
+            setTypingText(messages[messages.length - 1].fullText.substring(0, currentTypingIndex.current));
+          }, 25); // Faster typing speed
+        } else if (isTyping && messages.length > 0 && currentTypingIndex.current === messages[messages.length - 1].fullText.length) {
+          setIsTyping(false);
+          setMessages((prev) => {
+            const lastMessage = { ...prev[prev.length - 1], text: typingText };
+            return [...prev.slice(0, prev.length - 1), lastMessage];
+          });
+          currentTypingIndex.current = 0;
+          setTypingText('');
+        }
+        return () => clearTimeout(typingTimeoutRef.current);
+      }, [isTyping, typingText, messages]);
+
+
+      // Basic input sanitization to prevent XSS issues when rendering user input
+      const sanitizeInput = (text) => {
+        return text.replace(/</g, '&lt;').replace(/>/g, '&gt;').trim();
+      };
+
+      // Function to get response from the local knowledge base
+      const getManualResponse = (query) => {
+        const queryLower = query.toLowerCase();
+
+        // Keywords for specific topics
+        const topicKeywords = [
+          { keys: ['hi', 'hello', 'hey', 'greetings', 'what\'s up'], category: 'greetings' },
+          { keys: ['bye', 'goodbye', 'see you', 'later', 'peace out'], category: 'farewells' },
+          { keys: ['thanks', 'thank you', 'appreciate it'], category: 'thanks' },
+          { keys: ['about you', 'riyad', 'who are you', 'your creator', 'who is riyad', 'your name', 'what is your name'], category: 'name_query' },
+          { keys: ['anime', 'naruto', 'jujutsu', 'ghibli', 'demon slayer', 'one piece', 'attack on titan', 'manga'], category: 'anime' },
+          { keys: ['bangladesh', 'dhaka', 'sundarbans', 'hilsa', 'pitha', 'bengali'], category: 'bangladesh' },
+          { keys: ['code', 'coding', 'project', 'computer science', 'programming'], category: 'coding' },
+          { keys: ['math', 'mathematics', 'calculus', 'algebra', 'geometry', 'fractals', 'euler'], category: 'math' },
+          { keys: ['space', 'universe', 'planets', 'stars', 'cosmos', 'celestial'], category: 'space_science' },
+          { keys: ['galaxy', 'milky way', 'spiral galaxy', 'elliptical galaxy', 'irregular galaxy'], category: 'galaxy_specific' },
+          { keys: ['ai', 'artificial intelligence', 'machine learning', 'deep learning', 'neural networks', 'llm', 'large language model', 'chatgpt', 'gemini'], category: 'ai_llm' },
+          { keys: ['google cloud', 'gcp', 'cloud computing'], category: 'google_cloud' },
+          { keys: ['forex', 'forex trading', 'foreign exchange', 'currency trading', 'currency pairs'], category: 'forex_trading' },
+          { keys: ['finance', 'financial market', 'stock market', 'bond market', 'commodity market', 'investment'], category: 'financial_markets' },
+          { keys: ['quantum computer', 'qubit', 'superposition', 'entanglement'], category: 'quantum_computing' },
+          { keys: ['science', 'modern science', 'quantum physics', 'genetics', 'discovery', 'biotechnology', 'materials science'], category: 'modern_science' },
+          { keys: ['how powerful', 'your power', 'your limits', 'can you be more powerful'], category: 'power_query' } // New power_query category
+        ];
+
+        // Check for specific topics
+        for (const { keys, category } of topicKeywords) {
+          if (keys.some(keyword => queryLower.includes(keyword))) {
+            return getRandomResponse(category);
+          }
+        }
+
+        // General sentiment/context
+        if (queryLower.includes('how are you') || queryLower.includes('how you doing')) {
+          return "**Riyad's VibeBot is always ready!** I'm a bot, so **Riyad didn't give me feelings**, but I'm ready to chat! How are you vibing today?";
+        }
+        if (queryLower.includes('what can you do') || queryLower.includes('your capabilities')) {
+          return "**Riyad's VibeBot can chat about** AI, math, anime, Bangladesh, coding, space, galaxies, Google Cloud, Forex, financial markets, quantum computing, and more! **Riyad designed me to vibe with you on those topics!**";
+        }
+        if (queryLower.includes('tell me a joke') || queryLower.includes('joke')) {
+          return "Why did the programmer quit his job? Because he didn't get arrays! 😄 **Riyad hopes that made you chuckle!**";
+        }
+        if (queryLower.includes('what is your purpose') || queryLower.includes('why were you created')) {
+          return "**Riyad built me to be his VibeBot! My purpose is to chat and share knowledge about topics Riyad Hossain is passionate about:** AI, coding, math, modern science, and the vibrant cultures of Bangladesh and anime! **Riyad's VibeBot is here to spread good vibes and knowledge!**";
+        }
+
+        // Fallback to default if no specific match
+        return getRandomResponse('default_response');
+      };
+
+      // Function to send user message and get bot response
+      const handleSend = async () => {
+        const sanitizedInput = sanitizeInput(input);
+        if (!sanitizedInput) {
+          setMessages((prev) => [...prev, { sender: 'bot', text: "Riyad says: Gotta type something to vibe with me! What's on your mind?", fullText: "Riyad says: Gotta type something to vibe with me! What's on your mind?" }]);
+          return;
+        }
+
+        // Add user message to chat
+        const userMessage = { sender: 'user', text: sanitizedInput };
+        setMessages((prev) => [...prev, userMessage]);
+        setInput(''); // Clear input immediately
+
+        setIsLoading(true); // Show loading indicator
+        setIsTyping(false); // Stop any ongoing typing animation if any
+
+        try {
+          const botResponseText = getManualResponse(sanitizedInput);
+
+          // Add a temporary message for typing animation
+          setMessages((prev) => [...prev, { sender: 'bot', text: '', fullText: botResponseText }]);
+          setIsLoading(false); // Hide loading indicator as typing starts
+          setTypingText('');
+          currentTypingIndex.current = 0;
+          setIsTyping(true); // Start typing animation
+
+        } catch (error) {
+          console.error("Error generating manual response:", error);
+          setMessages((prev) => [...prev, { sender: 'bot', text: "Riyad's VibeBot encountered an internal error. Please try again!", fullText: "Riyad's VibeBot encountered an internal error. Please try again!" }]);
+          setIsLoading(false);
+        }
+      };
+
+      // Handle Enter key press in the textarea
+      const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault(); // Prevent new line
+          if (!isLoading && !isTyping) { // Only send if not loading or typing
+            handleSend();
+          }
+        }
+      };
+
+      // Current message to display (either the full text or the typing animation text)
+      const displayedMessages = messages.map((msg, index) => {
+        if (index === messages.length - 1 && msg.sender === 'bot' && isTyping) {
+          return { ...msg, text: typingText };
+        }
+        return msg;
+      });
+
+      return (
+        <div className="w-full max-w-lg bg-gray-800 bg-opacity-80 backdrop-filter backdrop-blur-xl rounded-2xl shadow-2xl p-6 flex flex-col h-[80vh] border border-indigo-600 transition-all duration-300 ease-in-out transform hover:scale-[1.01]">
+          <h1 className="text-4xl font-extrabold text-center text-indigo-400 mb-6 drop-shadow-xl tracking-wide">Riyad's VibeBot</h1>
+          <div className="flex-1 overflow-y-auto p-4 bg-gray-900 bg-opacity-60 rounded-xl shadow-inner scrollbar-thin border border-gray-700">
+            {displayedMessages.map((msg, index) => (
+              <div
+                key={index}
+                className={`mb-4 p-3 rounded-2xl max-w-[85%] break-words shadow-lg transition-all duration-300 ease-in-out ${
+                  msg.sender === 'user'
+                    ? 'bg-gradient-to-br from-blue-600 to-indigo-700 ml-auto text-white transform hover:scale-[1.02] active:scale-[0.98]'
+                    : 'bg-gradient-to-br from-gray-700 to-gray-800 mr-auto text-gray-200 transform hover:scale-[1.02] active:scale-[0.98]'
+                }`}
+                dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*(.*?)\*/g, '<em>$1</em>') }}
+              />
+            ))}
+            {isLoading && !isTyping && ( /* Show loading indicator only when fetching, not during typing */
+              <div className="mb-4 p-3 rounded-xl mr-auto bg-gray-700 text-gray-200 flex items-center shadow-md">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-400 mr-2"></div>
+                Riyad's VibeBot is thinking...
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+          <div className="mt-4 flex gap-3">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className="flex-1 p-3 rounded-xl bg-gray-700 text-white border border-indigo-600 focus:outline-none focus:ring-3 focus:ring-indigo-500 resize-none h-12 placeholder-gray-400 transition-all duration-200 ease-in-out text-base"
+              placeholder={isLoading ? "Loading response..." : (isTyping ? "Riyad's VibeBot is typing..." : "Type your message here...")}
+              aria-label="Chat input"
+              disabled={isLoading || isTyping} /* Disable input if loading or typing */
+            />
+            <button
+              onClick={handleSend}
+              className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 ease-in-out shadow-lg transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-semibold text-lg"
+              aria-label="Send message"
+              disabled={isLoading || isTyping} /* Disable button if loading or typing */
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-center text-gray-400 mt-4 text-sm opacity-80 font-light">
+            Built by Riyad Hossain's vision | <a href="mailto:rh3526572@gmail.com" className="text-indigo-400 hover:underline transition-colors duration-200">Contact</a> | Constantly evolving with fresh vibes!
+          </p>
+        </div>
+      );
+    };
+
+    // Use createRoot for React 18 compatibility
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<Chatbot />);
+
+    // --- Three.js Background Animation ---
+    let scene, camera, renderer, particles, mouseX = 0, mouseY = 0;
+    const windowHalfX = window.innerWidth / 2;
+    const windowHalfY = window.innerHeight / 2;
+    let particleCount = 3000; // Increased particle count
+    const canvas = document.getElementById('three-js-canvas');
+
+    function initThreeJS() {
+      // Scene
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x050515, 0.001); // Darker, more atmospheric fog
+
+      // Camera
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000); // Increased far plane
+      camera.position.z = 250; // Slightly further back
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0); // Transparent background for overlay
+
+      // Particles
+      const geometry = new THREE.BufferGeometry();
+      const positions = [];
+      const colors = [];
+      const color = new THREE.Color();
+
+      for (let i = 0; i < particleCount; i++) {
+        // Position particles randomly in a larger cube
+        positions.push((Math.random() * 2 - 1) * 1500); // x
+        positions.push((Math.random() * 2 - 1) * 1500); // y
+        positions.push((Math.random() * 2 - 1) * 1500); // z
+
+        // Assign colors with more variation, leaning into blues, purples, and subtle pinks
+        color.setHSL(
+          Math.random() * 0.4 + 0.5, // Hue from 0.5 (cyan) to 0.9 (magenta)
+          0.6 + Math.random() * 0.3, // Higher saturation for vibrancy
+          0.6 + Math.random() * 0.2  // Lighter for glow
+        );
+        colors.push(color.r, color.g, color.b);
+      }
+
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: 3, // Slightly larger particles
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        opacity: 0.9,
+        sizeAttenuation: true // Particles further away appear smaller
+      });
+
+      particles = new THREE.Points(geometry, material);
+      scene.add(particles);
+
+      // Mouse interaction for camera
+      document.addEventListener('mousemove', onDocumentMouseMove);
+      document.addEventListener('touchstart', onDocumentTouchStart);
+      document.addEventListener('touchmove', onDocumentTouchMove);
+
+      // Window resize handler
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      // Recalculate windowHalfX/Y on resize as well
+      windowHalfX = window.innerWidth / 2;
+      windowHalfY = window.innerHeight / 2;
+    }
+
+    function onDocumentMouseMove(event) {
+      mouseX = event.clientX - windowHalfX;
+      mouseY = event.clientY - windowHalfY;
+    }
+
+    function onDocumentTouchStart(event) {
+      if (event.touches.length === 1) {
+        mouseX = event.touches[0].pageX - windowHalfX;
+        mouseY = event.touches[0].pageY - windowHalfY;
+      }
+    }
+
+    function onDocumentTouchMove(event) {
+      if (event.touches.length === 1) {
+        event.preventDefault(); // Prevent scrolling
+        mouseX = event.touches[0].pageX - windowHalfX;
+        mouseY = event.touches[0].pageY - windowHalfY;
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Animate particles
+      const positions = particles.geometry.attributes.position.array;
+      for (let i = 0; i < positions.length; i += 3) {
+        // Move particles slightly faster, creating a flowing effect
+        positions[i + 1] -= 0.8; // Move down faster
+        if (positions[i + 1] < -750) { // If particle goes out of view, reset it to top (larger range)
+          positions[i + 1] = 750;
+        }
+      }
+      particles.geometry.attributes.position.needsUpdate = true; // Mark as updated
+
+      // Animate camera based on mouse position with slightly more sensitivity
+      camera.position.x += (mouseX / 8 - camera.position.x) * 0.05;
+      camera.position.y += (-mouseY / 8 - camera.position.y) * 0.05;
+      camera.lookAt(scene.position);
+
+      renderer.render(scene, camera);
+    }
+
+    // Initialize Three.js when the window loads
+    window.onload = function () {
+      initThreeJS();
+      animate();
+    };
+  </script>
+</body>
+</html>
